@@ -1,0 +1,14 @@
+[
+  {
+    "subject": "Urgent: Your account will be suspended",
+    "body": "Dear user, unusual activity detected. Verify immediately at http://bit.ly/secure-login-verify to avoid suspension."
+  },
+  {
+    "subject": "Interview confirmation",
+    "body": "Hi Muhammad, your interview is scheduled for Monday at 11:00 AM. Please bring your student ID."
+  },
+  {
+    "subject": "Password reset required",
+    "body": "Your mailbox password expires today. Reset now at https://mail-security-check.com/login/update."
+  }
+]
