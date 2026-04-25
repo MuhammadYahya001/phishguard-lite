@@ -1,9 +1,11 @@
 import json
 import re
+import time
 from urllib.parse import urlparse
 
 import tldextract
 from openai import OpenAI
+from openai import RateLimitError, APIError
 from prompts import SYSTEM_PROMPT, USER_PROMPT_TEMPLATE
 
 
@@ -84,6 +86,15 @@ def clamp_score(v):
     return max(0, min(100, v))
 
 
+def fallback_json(reason: str):
+    return json.dumps({
+        "label": "Suspicious",
+        "risk_score": 55,
+        "reasons": [reason],
+        "indicators": ["service_unavailable"]
+    })
+
+
 def call_llm(subject: str, body: str, findings_text: str):
     client = OpenAI()
     prompt = USER_PROMPT_TEMPLATE.format(
@@ -91,15 +102,37 @@ def call_llm(subject: str, body: str, findings_text: str):
         body=body.strip(),
         url_findings=findings_text.strip()
     )
-    resp = client.chat.completions.create(
-        model="gpt-4o-mini",
-        temperature=0.1,
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": prompt},
-        ],
-    )
-    return resp.choices[0].message.content.strip()
+
+    # Retry a couple of times for transient errors/rate limits
+    retries = 2
+    backoff_seconds = 2
+
+    for attempt in range(retries + 1):
+        try:
+            resp = client.chat.completions.create(
+                model="gpt-4o-mini",
+                temperature=0.1,
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": prompt},
+                ],
+            )
+            return resp.choices[0].message.content.strip()
+
+        except RateLimitError:
+            if attempt < retries:
+                time.sleep(backoff_seconds * (attempt + 1))
+                continue
+            return fallback_json("LLM unavailable: rate limit or quota exceeded")
+
+        except APIError:
+            if attempt < retries:
+                time.sleep(backoff_seconds * (attempt + 1))
+                continue
+            return fallback_json("LLM unavailable: API error")
+
+        except Exception as e:
+            return fallback_json(f"LLM unavailable: {type(e).__name__}")
 
 
 def analyze_email(subject: str, body: str):
