@@ -1,5 +1,8 @@
 # phishguard-lite# PhishGuard Lite 🛡️
 
+## Live Demo
+[Open App](https://phishguard-lite.streamlit.app/)
+
 AI-assisted phishing email detector using **Python + Streamlit + OpenAI**.
 
 ## Features
