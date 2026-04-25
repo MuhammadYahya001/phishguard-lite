@@ -1,3 +1,10 @@
+"""
+detector.py — heuristic phishing analysis engine.
+
+Scores an email on keyword signals, URL heuristics, credential requests,
+and urgency language. Returns a structured result dict with label, risk
+score, reasons, indicators, and per-URL findings.
+"""
 import re
 from urllib.parse import urlparse
 import tldextract

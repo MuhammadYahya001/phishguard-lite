@@ -1,3 +1,10 @@
+"""
+prompts.py — prompt templates for optional LLM-backed analysis.
+
+These are used when an OpenAI-compatible model is integrated; the default
+mode uses heuristic analysis in detector.py without any API calls.
+"""
+
 SYSTEM_PROMPT = """
 You are a cybersecurity email threat analyst.
 Classify the email into one of:
