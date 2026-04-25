@@ -1,13 +1,7 @@
-import os
 import streamlit as st
 from detector import analyze_email
 
 st.set_page_config(page_title="PhishGuard Lite", page_icon="🛡️", layout="wide")
-
-# OpenRouter key check (instead of OPENAI_API_KEY)
-if not os.getenv("OPENROUTER_API_KEY"):
-    st.error("Missing OPENROUTER_API_KEY in secrets/.env")
-    st.stop()
 
 st.markdown("""
 <style>
@@ -18,7 +12,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("🛡️ PhishGuard Lite")
-st.markdown("<div class='muted'>AI-powered phishing email detector with URL + language analysis</div>", unsafe_allow_html=True)
+st.markdown("<div class='muted'>Free heuristic phishing detector (no API key required)</div>", unsafe_allow_html=True)
 st.write("")
 
 c1, c2 = st.columns([1.25, 1], gap="large")
@@ -54,26 +48,24 @@ with c2:
             st.progress(score)
 
             st.markdown("**Reasons**")
-            for reason in r.get("reasons", []):
+            for reason in r["reasons"]:
                 st.write(f"- {reason}")
 
             st.markdown("**Indicators**")
-            inds = r.get("indicators", [])
-            st.write(", ".join(inds) if inds else "None")
+            st.write(", ".join(r["indicators"]) if r["indicators"] else "None")
 
             st.markdown("**URL Analysis**")
-            urls = r.get("urls", [])
-            if urls:
-                for u in urls:
-                    flags = ", ".join(u.get("flags", [])) if u.get("flags") else "none"
-                    st.write(f"- `{u.get('domain', 'unknown')}` → {flags}")
+            if r["urls"]:
+                for u in r["urls"]:
+                    flags = ", ".join(u["flags"]) if u["flags"] else "none"
+                    st.write(f"- `{u['domain']}` → {flags}")
             else:
                 st.write("No URLs found.")
 
-            with st.expander("Model Output (debug)"):
-                st.code(r.get("raw_model_output", "N/A"))
+            with st.expander("Engine Output (debug)"):
+                st.code(r["raw_model_output"])
     else:
         st.info("Submit an email to see analysis.")
     st.markdown("</div>", unsafe_allow_html=True)
 
-st.caption("Educational use only — not a replacement for enterprise email security.")
+st.caption("Educational use only — heuristic analysis, not a replacement for enterprise email security.")
