@@ -1,11 +1,13 @@
 import os
 import streamlit as st
-from dotenv import load_dotenv
 from detector import analyze_email
 
-load_dotenv()
-
 st.set_page_config(page_title="PhishGuard Lite", page_icon="🛡️", layout="wide")
+
+# OpenRouter key check (instead of OPENAI_API_KEY)
+if not os.getenv("OPENROUTER_API_KEY"):
+    st.error("Missing OPENROUTER_API_KEY in secrets/.env")
+    st.stop()
 
 st.markdown("""
 <style>
@@ -15,12 +17,8 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-if not os.getenv("OPENAI_API_KEY"):
-    st.error("Missing OPENAI_API_KEY in .env")
-    st.stop()
-
 st.title("🛡️ PhishGuard Lite")
-st.markdown("<div class='muted'>AI-assisted phishing email detector (Cyber + AI project)</div>", unsafe_allow_html=True)
+st.markdown("<div class='muted'>AI-powered phishing email detector with URL + language analysis</div>", unsafe_allow_html=True)
 st.write("")
 
 c1, c2 = st.columns([1.25, 1], gap="large")
@@ -56,24 +54,26 @@ with c2:
             st.progress(score)
 
             st.markdown("**Reasons**")
-            for reason in r["reasons"]:
+            for reason in r.get("reasons", []):
                 st.write(f"- {reason}")
 
             st.markdown("**Indicators**")
-            st.write(", ".join(r["indicators"]) if r["indicators"] else "None")
+            inds = r.get("indicators", [])
+            st.write(", ".join(inds) if inds else "None")
 
             st.markdown("**URL Analysis**")
-            if r["urls"]:
-                for u in r["urls"]:
-                    flags = ", ".join(u["flags"]) if u["flags"] else "none"
-                    st.write(f"- `{u['domain']}` → {flags}")
+            urls = r.get("urls", [])
+            if urls:
+                for u in urls:
+                    flags = ", ".join(u.get("flags", [])) if u.get("flags") else "none"
+                    st.write(f"- `{u.get('domain', 'unknown')}` → {flags}")
             else:
                 st.write("No URLs found.")
 
-            with st.expander("Raw Model Output (debug)"):
-                st.code(r["raw_model_output"], language="json")
+            with st.expander("Model Output (debug)"):
+                st.code(r.get("raw_model_output", "N/A"))
     else:
         st.info("Submit an email to see analysis.")
     st.markdown("</div>", unsafe_allow_html=True)
 
-st.caption("Educational use only — not a replacement for enterprise secure email gateways.")
+st.caption("Educational use only — not a replacement for enterprise email security.")
