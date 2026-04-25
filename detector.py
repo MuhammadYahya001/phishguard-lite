@@ -1,11 +1,12 @@
 import json
+import os
 import re
 import time
 from urllib.parse import urlparse
 
 import tldextract
 from openai import OpenAI
-from openai import RateLimitError, APIError
+from openai import APIError, RateLimitError
 from prompts import SYSTEM_PROMPT, USER_PROMPT_TEMPLATE
 
 
@@ -96,40 +97,58 @@ def fallback_json(reason: str):
 
 
 def call_llm(subject: str, body: str, findings_text: str):
-    client = OpenAI()
+    api_key = os.getenv("OPENROUTER_API_KEY")
+    if not api_key:
+        return fallback_json("Missing OPENROUTER_API_KEY")
+
+    client = OpenAI(
+        api_key=api_key,
+        base_url="https://openrouter.ai/api/v1",
+    )
+
     prompt = USER_PROMPT_TEMPLATE.format(
         subject=subject.strip(),
         body=body.strip(),
         url_findings=findings_text.strip()
     )
 
-    # Retry a couple of times for transient errors/rate limits
+    # OpenRouter model examples:
+    # - "openai/gpt-4o-mini"
+    # - "meta-llama/llama-3.1-8b-instruct"
+    # Pick one available in your OpenRouter account.
+    model_name = os.getenv("OPENROUTER_MODEL", "openai/gpt-4o-mini")
+
     retries = 2
     backoff_seconds = 2
 
     for attempt in range(retries + 1):
         try:
             resp = client.chat.completions.create(
-                model="gpt-4o-mini",
+                model=model_name,
                 temperature=0.1,
                 messages=[
                     {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": prompt},
                 ],
+                extra_headers={
+                    # Optional but recommended by OpenRouter for app identification
+                    "HTTP-Referer": os.getenv("APP_URL", "https://localhost"),
+                    "X-Title": os.getenv("APP_NAME", "PhishGuard Lite"),
+                },
             )
-            return resp.choices[0].message.content.strip()
+            return (resp.choices[0].message.content or "").strip()
 
         except RateLimitError:
             if attempt < retries:
                 time.sleep(backoff_seconds * (attempt + 1))
                 continue
-            return fallback_json("LLM unavailable: rate limit or quota exceeded")
+            return fallback_json("LLM unavailable: rate limit or quota exceeded (OpenRouter)")
 
         except APIError:
             if attempt < retries:
                 time.sleep(backoff_seconds * (attempt + 1))
                 continue
-            return fallback_json("LLM unavailable: API error")
+            return fallback_json("LLM unavailable: API error (OpenRouter)")
 
         except Exception as e:
             return fallback_json(f"LLM unavailable: {type(e).__name__}")
