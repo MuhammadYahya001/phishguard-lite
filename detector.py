@@ -73,7 +73,7 @@ def safe_json_parse(raw: str):
     s, e = raw.find("{"), raw.rfind("}")
     if s != -1 and e != -1 and e > s:
         try:
-            return json.loads(raw[s:e+1])
+            return json.loads(raw[s:e + 1])
         except Exception:
             return None
     return None
@@ -112,10 +112,9 @@ def call_llm(subject: str, body: str, findings_text: str):
         url_findings=findings_text.strip()
     )
 
-    # OpenRouter model examples:
-    # - "openai/gpt-4o-mini"
-    # - "meta-llama/llama-3.1-8b-instruct"
-    # Pick one available in your OpenRouter account.
+    # Set in env/secrets. Examples:
+    # "openai/gpt-4o-mini"
+    # "meta-llama/llama-3.1-8b-instruct"
     model_name = os.getenv("OPENROUTER_MODEL", "openai/gpt-4o-mini")
 
     retries = 2
@@ -130,11 +129,6 @@ def call_llm(subject: str, body: str, findings_text: str):
                     {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": prompt},
                 ],
-                extra_headers={
-                    # Optional but recommended by OpenRouter for app identification
-                    "HTTP-Referer": os.getenv("APP_URL", "https://localhost"),
-                    "X-Title": os.getenv("APP_NAME", "PhishGuard Lite"),
-                },
             )
             return (resp.choices[0].message.content or "").strip()
 
@@ -144,11 +138,13 @@ def call_llm(subject: str, body: str, findings_text: str):
                 continue
             return fallback_json("LLM unavailable: rate limit or quota exceeded (OpenRouter)")
 
-        except APIError:
+        except APIError as e:
+            # Keep message concise but useful for debugging
+            msg = str(e).split("\n")[0][:200]
             if attempt < retries:
                 time.sleep(backoff_seconds * (attempt + 1))
                 continue
-            return fallback_json("LLM unavailable: API error (OpenRouter)")
+            return fallback_json(f"LLM unavailable: API error (OpenRouter) - {msg}")
 
         except Exception as e:
             return fallback_json(f"LLM unavailable: {type(e).__name__}")
@@ -163,6 +159,7 @@ def analyze_email(subject: str, body: str):
     parsed = safe_json_parse(raw)
 
     if not parsed:
+        # Heuristic fallback if model output is not parseable JSON
         score = 20 + len(k_hits) * 8
         for uf in u_findings:
             if "ip_in_url" in uf["flags"]:
@@ -212,6 +209,4 @@ def analyze_email(subject: str, body: str):
         "reasons": reasons,
         "indicators": indicators,
         "urls": u_findings,
-        "keyword_hits": k_hits,
-        "raw_model_output": raw,
-    }
+*
